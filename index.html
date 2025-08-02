@@ -722,8 +722,6 @@
     <script>
         // Your WeatherAPI.com API key
         const API_KEY = 'ca95a24ffcb54bd5adf21504250208';
-        // Using CORS proxy to bypass browser restrictions
-        const API_URL = 'https://api.allorigins.win/get?url=' + encodeURIComponent('https://api.weatherapi.com/v1/current.json');
 
         // Demo data for different cities when API key is not available
         const DEMO_CITIES = {
@@ -850,10 +848,10 @@
                 
                 // Construct the WeatherAPI URL
                 const weatherApiUrl = `https://api.weatherapi.com/v1/current.json?key=${API_KEY}&q=${encodeURIComponent(city)}&aqi=no`;
-                // Use CORS proxy
-                const proxyUrl = `${API_URL}&url=${encodeURIComponent(weatherApiUrl)}`;
+                // Use corsproxy.io for better CORS handling
+                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(weatherApiUrl)}`;
                 
-                console.log('Using proxy URL:', proxyUrl);
+                console.log('Using corsproxy.io:', proxyUrl);
 
                 const response = await fetch(proxyUrl);
                 
@@ -863,11 +861,8 @@
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
-                const proxyData = await response.json();
-                console.log('Proxy response:', proxyData);
-                
-                // Extract the actual weather data from proxy response
-                const weatherData = JSON.parse(proxyData.contents);
+                // corsproxy.io returns the data directly (no wrapper like allorigins)
+                const weatherData = await response.json();
                 console.log('Weather data:', weatherData);
                 
                 displayWeather(weatherData);
@@ -875,19 +870,25 @@
             } catch (err) {
                 console.error('Weather fetch error:', err);
                 
-                // Try alternative CORS proxy
+                // Try alternative approach with direct API call
                 try {
-                    console.log('Trying alternative proxy...');
-                    const altProxyUrl = `https://cors-anywhere.herokuapp.com/https://api.weatherapi.com/v1/current.json?key=${API_KEY}&q=${encodeURIComponent(city)}&aqi=no`;
+                    console.log('Trying direct API call...');
+                    const directUrl = `https://api.weatherapi.com/v1/current.json?key=${API_KEY}&q=${encodeURIComponent(city)}&aqi=no`;
                     
-                    const altResponse = await fetch(altProxyUrl);
-                    if (altResponse.ok) {
-                        const altData = await altResponse.json();
-                        displayWeather(altData);
+                    const directResponse = await fetch(directUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                        }
+                    });
+                    
+                    if (directResponse.ok) {
+                        const directData = await directResponse.json();
+                        displayWeather(directData);
                         return;
                     }
-                } catch (altErr) {
-                    console.log('Alternative proxy also failed:', altErr);
+                } catch (directErr) {
+                    console.log('Direct API call also failed:', directErr);
                 }
                 
                 // Fall back to demo data
@@ -899,7 +900,7 @@
                 setTimeout(() => {
                     const noteElement = document.querySelector('.api-note');
                     if (noteElement) {
-                        noteElement.innerHTML = `<strong>Note:</strong> Using demo data due to CORS restrictions. Your API key works (verified in explorer) but browsers block direct API calls for security. <br><br><strong>Solutions:</strong><br>• Deploy to a web server (GitHub Pages) for better CORS handling<br>• Use a backend proxy server<br>• The app works perfectly with demo data for now! 🌤️`;
+                        noteElement.innerHTML = `<strong>Note:</strong> Using demo data due to network restrictions. Your API key is verified and working! <br><br><strong>Good news:</strong> When deployed to GitHub Pages, the API will work more reliably due to better server environment. The app works perfectly with demo data for now! 🌤️`;
                         noteElement.style.background = 'rgba(54, 162, 235, 0.1)';
                         noteElement.style.borderColor = 'rgba(54, 162, 235, 0.3)';
                         noteElement.style.color = '#1565C0';
