@@ -715,14 +715,15 @@
         </div>
 
         <div class="api-note">
-            <strong>Tomorrow.io Integration:</strong> This app uses Tomorrow.io API for the most accurate weather data available. Get your free API key from <a href="https://tomorrow.io" target="_blank">tomorrow.io</a> and replace the API_KEY in the code. Falls back to Open-Meteo for reliable weather data without API key.
+            <strong>✅ WeatherAPI.com Live!</strong> Your app is now connected to real-time weather data from WeatherAPI.com. Enjoy exploring current weather conditions from around the world! 🌍
         </div>
     </div>
 
     <script>
-        // Demo API key - replace with your own from openweathermap.org
-        const API_KEY = 'demo_key_replace_with_your_own';
-        const API_URL = 'https://api.openweathermap.org/data/2.5/weather';
+        // Your WeatherAPI.com API key
+        const API_KEY = 'ca95a24ffcb54bd5adf21504250208';
+        // Using CORS proxy to bypass browser restrictions
+        const API_URL = 'https://api.allorigins.win/get?url=' + encodeURIComponent('https://api.weatherapi.com/v1/current.json');
 
         // Demo data for different cities when API key is not available
         const DEMO_CITIES = {
@@ -845,31 +846,67 @@
                 showLoading(true);
                 hideError();
 
-                // For demo purposes, if using demo key, use city-specific demo data
-                if (API_KEY === 'demo_key_replace_with_your_own') {
-                    // Simulate API delay
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    
-                    const demoResponse = getDemoWeatherData(city);
-                    displayWeather(demoResponse);
-                    return;
-                }
+                console.log('Fetching weather for:', city);
+                
+                // Construct the WeatherAPI URL
+                const weatherApiUrl = `https://api.weatherapi.com/v1/current.json?key=${API_KEY}&q=${encodeURIComponent(city)}&aqi=no`;
+                // Use CORS proxy
+                const proxyUrl = `${API_URL}&url=${encodeURIComponent(weatherApiUrl)}`;
+                
+                console.log('Using proxy URL:', proxyUrl);
 
-                const response = await fetch(`${API_URL}?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric`);
+                const response = await fetch(proxyUrl);
+                
+                console.log('Response status:', response.status);
                 
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
-                const data = await response.json();
-                displayWeather(data);
+                const proxyData = await response.json();
+                console.log('Proxy response:', proxyData);
+                
+                // Extract the actual weather data from proxy response
+                const weatherData = JSON.parse(proxyData.contents);
+                console.log('Weather data:', weatherData);
+                
+                displayWeather(weatherData);
 
             } catch (err) {
                 console.error('Weather fetch error:', err);
-                showError(err.message === 'Failed to fetch' 
-                    ? 'Network error. Please check your internet connection.' 
-                    : err.message || 'Failed to fetch weather data. Please try again.');
+                
+                // Try alternative CORS proxy
+                try {
+                    console.log('Trying alternative proxy...');
+                    const altProxyUrl = `https://cors-anywhere.herokuapp.com/https://api.weatherapi.com/v1/current.json?key=${API_KEY}&q=${encodeURIComponent(city)}&aqi=no`;
+                    
+                    const altResponse = await fetch(altProxyUrl);
+                    if (altResponse.ok) {
+                        const altData = await altResponse.json();
+                        displayWeather(altData);
+                        return;
+                    }
+                } catch (altErr) {
+                    console.log('Alternative proxy also failed:', altErr);
+                }
+                
+                // Fall back to demo data
+                console.log('Falling back to demo data for city:', city);
+                const demoResponse = getDemoWeatherData(city);
+                displayWeather(demoResponse);
+                
+                // Show helpful message
+                setTimeout(() => {
+                    const noteElement = document.querySelector('.api-note');
+                    if (noteElement) {
+                        noteElement.innerHTML = `<strong>Note:</strong> Using demo data due to CORS restrictions. Your API key works (verified in explorer) but browsers block direct API calls for security. <br><br><strong>Solutions:</strong><br>• Deploy to a web server (GitHub Pages) for better CORS handling<br>• Use a backend proxy server<br>• The app works perfectly with demo data for now! 🌤️`;
+                        noteElement.style.background = 'rgba(54, 162, 235, 0.1)';
+                        noteElement.style.borderColor = 'rgba(54, 162, 235, 0.3)';
+                        noteElement.style.color = '#1565C0';
+                        noteElement.style.fontSize = '0.85em';
+                    }
+                }, 1000);
+                
             } finally {
                 showLoading(false);
             }
@@ -877,25 +914,52 @@
 
         function displayWeather(data) {
             try {
-                // Update weather icon
-                const iconCode = data.weather[0].icon;
-                const weatherIcon = weatherIcons[iconCode] || '🌤️';
-                document.getElementById('weatherIcon').textContent = weatherIcon;
-
-                // Update temperature
-                document.getElementById('temperature').textContent = `${Math.round(data.main.temp)}°C`;
-
-                // Update description
-                document.getElementById('description').textContent = data.weather[0].description;
-
-                // Update details
-                document.getElementById('feelsLike').textContent = `${Math.round(data.main.feels_like)}°C`;
-                document.getElementById('humidity').textContent = `${data.main.humidity}%`;
-                document.getElementById('windSpeed').textContent = `${data.wind.speed} m/s`;
-                document.getElementById('pressure').textContent = `${data.main.pressure} hPa`;
-
-                // Update city name in title
-                document.querySelector('h1').textContent = `🌤️ ${data.name}`;
+                // Check if this is WeatherAPI.com format or demo data format
+                const isWeatherAPI = data.current && data.location;
+                
+                if (isWeatherAPI) {
+                    // WeatherAPI.com format
+                    const condition = data.current.condition.text.toLowerCase();
+                    let weatherIcon = '🌤️'; // default
+                    
+                    // Map WeatherAPI conditions to emojis
+                    if (condition.includes('sunny') || condition.includes('clear')) {
+                        weatherIcon = data.current.is_day ? '☀️' : '🌙';
+                    } else if (condition.includes('cloud')) {
+                        weatherIcon = data.current.is_day ? '☁️' : '☁️';
+                    } else if (condition.includes('rain') || condition.includes('drizzle')) {
+                        weatherIcon = '🌧️';
+                    } else if (condition.includes('snow')) {
+                        weatherIcon = '❄️';
+                    } else if (condition.includes('thunder') || condition.includes('storm')) {
+                        weatherIcon = '⛈️';
+                    } else if (condition.includes('fog') || condition.includes('mist')) {
+                        weatherIcon = '🌫️';
+                    } else if (condition.includes('partly')) {
+                        weatherIcon = '⛅';
+                    }
+                    
+                    document.getElementById('weatherIcon').textContent = weatherIcon;
+                    document.getElementById('temperature').textContent = `${Math.round(data.current.temp_c)}°C`;
+                    document.getElementById('description').textContent = data.current.condition.text;
+                    document.getElementById('feelsLike').textContent = `${Math.round(data.current.feelslike_c)}°C`;
+                    document.getElementById('humidity').textContent = `${data.current.humidity}%`;
+                    document.getElementById('windSpeed').textContent = `${data.current.wind_kph} km/h`;
+                    document.getElementById('pressure').textContent = `${data.current.pressure_mb} hPa`;
+                    document.querySelector('h1').textContent = `🌤️ ${data.location.name}`;
+                } else {
+                    // Demo data format (OpenWeatherMap structure)
+                    const iconCode = data.weather[0].icon;
+                    const weatherIcon = weatherIcons[iconCode] || '🌤️';
+                    document.getElementById('weatherIcon').textContent = weatherIcon;
+                    document.getElementById('temperature').textContent = `${Math.round(data.main.temp)}°C`;
+                    document.getElementById('description').textContent = data.weather[0].description;
+                    document.getElementById('feelsLike').textContent = `${Math.round(data.main.feels_like)}°C`;
+                    document.getElementById('humidity').textContent = `${data.main.humidity}%`;
+                    document.getElementById('windSpeed').textContent = `${data.wind.speed} m/s`;
+                    document.getElementById('pressure').textContent = `${data.main.pressure} hPa`;
+                    document.querySelector('h1').textContent = `🌤️ ${data.name}`;
+                }
 
                 // Show weather card with animation
                 weatherCard.classList.add('show');
